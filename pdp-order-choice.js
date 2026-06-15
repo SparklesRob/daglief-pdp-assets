@@ -488,15 +488,20 @@
       return fetchDesign(designId)
         .then(function (design) {
           var preset = createDigitalPreset(variant);
+          var convertPayload = buildConvertPayload(design.pages, preset);
+          var convertBody = new URLSearchParams();
+          convertBody.set('fold', convertPayload.fold);
+          convertBody.set('new_pages', JSON.stringify(convertPayload.new_pages));
+          convertBody.set('source_design_json', JSON.stringify(convertPayload.source_design_json));
 
           return fetch('/convert_editor_design?coid=' + encodeURIComponent(design.coid), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
               Accept: 'application/json',
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
             },
-            body: JSON.stringify(buildConvertPayload(design.pages, preset))
+            body: convertBody.toString()
           }).then(function (response) {
             if (!response.ok) throw new Error('Het omzetten naar digitaal formaat is niet gelukt.');
             return response.json().then(function () {
