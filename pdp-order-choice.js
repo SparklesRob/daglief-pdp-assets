@@ -489,19 +489,18 @@
         .then(function (design) {
           var preset = createDigitalPreset(variant);
           var convertPayload = buildConvertPayload(design.pages, preset);
-          var convertBody = new URLSearchParams();
-          convertBody.set('fold', convertPayload.fold);
-          convertBody.set('new_pages', JSON.stringify(convertPayload.new_pages));
-          convertBody.set('source_design_json', JSON.stringify(convertPayload.source_design_json));
+          var convertParams = new URLSearchParams();
+          convertParams.set('coid', design.coid);
+          convertParams.set('fold', convertPayload.fold);
+          convertParams.set('new_pages', JSON.stringify(convertPayload.new_pages));
+          convertParams.set('source_design_json', JSON.stringify(convertPayload.source_design_json));
 
-          return fetch('/convert_editor_design?coid=' + encodeURIComponent(design.coid), {
+          return fetch('/convert_editor_design?' + convertParams.toString(), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
-              Accept: 'application/json',
-              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-            },
-            body: convertBody.toString()
+              Accept: 'application/json'
+            }
           }).then(function (response) {
             if (!response.ok) throw new Error('Het omzetten naar digitaal formaat is niet gelukt.');
             return response.json().then(function () {
