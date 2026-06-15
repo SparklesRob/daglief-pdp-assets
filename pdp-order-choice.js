@@ -373,6 +373,8 @@
           String(preset.preset_id) === variant.id ||
           String(preset.format_id) === variant.id ||
           String(preset.cardtype_id) === variant.id ||
+          String(preset.freeform_template_id) === variant.id ||
+          String(preset.specs && preset.specs.freeform_template_id) === variant.id ||
           String(preset.href || '').indexOf(variant.href) !== -1 ||
           String(preset.url || '').indexOf(variant.href) !== -1;
       });
@@ -385,24 +387,13 @@
     }
 
     function getEditorPresets() {
-      var storageKey = 'dagliefDigitalFormatPresets';
-      var storedPresets = window.sessionStorage.getItem(storageKey);
-      if (storedPresets) {
-        try {
-          return Promise.resolve(JSON.parse(storedPresets));
-        } catch (error) {
-          window.sessionStorage.removeItem(storageKey);
-        }
-      }
-
-      return fetch('/api/editor_format_presets', { credentials: 'same-origin' })
+      return fetch('/api/editor_format_presets', {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      })
         .then(function (response) {
           if (!response.ok) throw new Error('Kon de editor-formaten niet ophalen.');
           return response.json();
-        })
-        .then(function (presets) {
-          window.sessionStorage.setItem(storageKey, JSON.stringify(presets));
-          return presets;
         });
     }
 
@@ -427,28 +418,47 @@
         });
     }
 
+    function getPresetPages(preset) {
+      if (preset.pages && preset.pages.length) return preset.pages;
+
+      if (!preset.specs || !preset.specs.sheets) return [];
+
+      return preset.specs.sheets.map(function (sheet) {
+        var spread = sheet.spreads && sheet.spreads[0]
+          ? sheet.spreads[0].find(function (item) { return !item.is_hidden; }) || sheet.spreads[0][0]
+          : null;
+
+        return {
+          bleed: sheet.bleed_canvas || 0,
+          height: spread ? spread.height : sheet.height_canvas,
+          width: spread ? spread.width : sheet.width_canvas
+        };
+      });
+    }
+
     function buildConvertPayload(designPages, preset) {
+      var presetPages = getPresetPages(preset);
       var oldSize = objectLength(designPages) - 1;
-      var aspectRatioTarget = preset.pages[0].height / preset.pages[0].width;
+      var aspectRatioTarget = presetPages[0].height / presetPages[0].width;
       var aspectRatioDesign = designPages.p1.h / designPages.p1.w;
       var scale = aspectRatioDesign > aspectRatioTarget ? 'height' : 'width';
       var pages;
 
-      if (oldSize === 2 && preset.pages.length === 4) {
-        pages = preset.pages.map(function (page, index) {
+      if (oldSize === 2 && presetPages.length === 4) {
+        pages = presetPages.map(function (page, index) {
           var oldKey = index + 1;
           if (index === 1) oldKey = 0;
           if (index === 2) oldKey = 2;
           if (index !== 1 && index !== 2 && index + 1 > oldSize) oldKey = 0;
           return Object.assign({ old_key: oldKey, new_key: index + 1 }, page, { scale: scale });
         });
-      } else if (oldSize === 4 && preset.pages.length === 2) {
-        pages = preset.pages.map(function (page, index) {
+      } else if (oldSize === 4 && presetPages.length === 2) {
+        pages = presetPages.map(function (page, index) {
           var oldKey = index === 0 ? 1 : 3;
           return Object.assign({ old_key: oldKey, new_key: index + 1 }, page, { scale: scale });
         });
       } else {
-        pages = preset.pages.map(function (page, index) {
+        pages = presetPages.map(function (page, index) {
           return Object.assign({
             old_key: index + 1 > oldSize ? 0 : index + 1,
             new_key: index + 1
@@ -477,7 +487,7 @@
         .then(function (results) {
           var design = results[0];
           var preset = findPresetByVariant(results[1], variant);
-          if (!preset || !preset.pages || !preset.pages.length) {
+          if (!preset || !getPresetPages(preset).length) {
             throw new Error('Het digitale formaat kon niet worden gevonden in de editor presets.');
           }
 
