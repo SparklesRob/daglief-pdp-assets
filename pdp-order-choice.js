@@ -18,8 +18,6 @@
 
     var form = document.querySelector('.choose-card-container form.choose-card-form') || document.querySelector('form.choose-card-form#choose_card_form');
     var chooseCard = document.querySelector('.choose-card');
-    var chooseCardContainer = document.querySelector('.choose-card-container') || chooseCard || form;
-
     if (!form || !chooseCard) return;
     if (document.querySelector('.dl-order-choice')) return;
 
@@ -83,6 +81,8 @@
     section.setAttribute('aria-label', 'Hoe wil je je kaart bestellen?');
     var digitalOptionImage = '/media/13304-kc-media/digitale-kaart-icons-digitale-kaart.webp';
     section.innerHTML = [
+      '<div class="dl-order-choice__primary"></div>',
+      '<div class="dl-order-choice__form-slot"></div>',
       '<div class="dl-order-choice__header">',
       '  <div class="dl-order-choice__title-wrap">',
       '    <h2 class="dl-order-choice__title">Hoe wil je je kaart bestellen?</h2>',
@@ -98,8 +98,6 @@
       '  Liever zelf de kaarten versturen? Dan kun je een pakket met gedrukte rouwkaarten bestellen. Zo bepaal je zelf wanneer en naar wie je de kaarten verstuurt.<br><br>',
       '  Veel families kiezen voor een combinatie van digitaal en gedrukt: digitaal om snel te informeren, en drukwerk als tastbare herinnering die vaak wordt bewaard en gekoesterd. Zo kies je eenvoudig de oplossing die het beste past bij jouw situatie, wensen en timing.',
       '</div>',
-      '<div class="dl-order-choice__primary"></div>',
-      '<div class="dl-order-choice__form-slot"></div>',
       '<div class="dl-order-choice__trigger-wrap">',
       '  <button class="dl-order-choice__open-options" type="button" aria-expanded="false" aria-controls="dl-order-choice-offcanvas">',
       '    <span class="dl-order-choice__open-visual"><img src="' + digitalOptionImage + '" alt=""></span>',
@@ -124,7 +122,7 @@
       '    <div class="dl-order-choice__grid"></div>',
       '  </div>',
       '  <div class="dl-order-choice__offcanvas-confirm">',
-      '    <button class="dl-order-choice__confirm" type="button"><i class="fa-solid fa-check" aria-hidden="true"></i> Toepassen</button>',
+      '    <div class="dl-order-choice__offcanvas-form-slot">Kies een optie om verder te gaan.</div>',
       '  </div>',
       '</aside>'
     ].join('');
@@ -162,7 +160,7 @@
     var offcanvas = section.querySelector('.dl-order-choice__offcanvas');
     var offcanvasBackdrop = section.querySelector('.dl-order-choice__offcanvas-backdrop');
     var offcanvasSelectedLabel = section.querySelector('#dl-order-choice-selected-label');
-    var confirmButton = section.querySelector('.dl-order-choice__confirm');
+    var offcanvasFormSlot = section.querySelector('.dl-order-choice__offcanvas-form-slot');
     choices.forEach(function (choice) {
       var card = createChoiceCard(choice);
       if (choice.id === 'physical') {
@@ -206,7 +204,6 @@
     }
 
     openOptionsButton.addEventListener('click', openOffcanvas);
-    confirmButton.addEventListener('click', closeOffcanvas);
     section.querySelectorAll('[data-dl-order-choice-close]').forEach(function (button) {
       button.addEventListener('click', closeOffcanvas);
     });
@@ -261,9 +258,14 @@
       if (choice.id === 'physical') {
         openSelected.hidden = true;
         openSelected.textContent = '';
+        formSlot.appendChild(chooseCard);
+        section.appendChild(notice);
       } else {
         openSelected.hidden = false;
         openSelected.textContent = 'Gekozen: ' + choice.label;
+        offcanvasFormSlot.textContent = '';
+        offcanvasFormSlot.appendChild(chooseCard);
+        offcanvasFormSlot.parentNode.insertBefore(notice, offcanvasFormSlot);
       }
 
       if (choice.id === 'physical' || choice.id === 'physical_digital') {

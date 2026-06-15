@@ -78,6 +78,10 @@
   margin-bottom: 0 !important;
 }
 
+body.dl-order-choice-active .pdp-usp-price-text {
+  display: none !important;
+}
+
 .dl-order-choice__trigger-wrap {
   margin: 0 0 18px;
 }
@@ -397,25 +401,28 @@ body.dl-order-choice-offcanvas-open {
   background: #fff;
 }
 
-.dl-order-choice__confirm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 48px;
-  border: 0;
-  border-radius: 8px;
-  background: #198754;
-  color: #fff;
-  font-size: 16px;
-  line-height: 24px;
-  font-weight: 700;
-  cursor: pointer;
+.dl-order-choice__offcanvas-form-slot {
+  color: #000;
+  font-size: 13px;
+  line-height: 22px;
 }
 
-.dl-order-choice__confirm:hover {
-  background: #157347;
+.dl-order-choice__offcanvas-form-slot .choose-card {
+  margin-bottom: 0 !important;
+}
+
+.dl-order-choice__offcanvas-form-slot .choose-card-container {
+  display: block !important;
+  width: 100%;
+}
+
+.dl-order-choice__offcanvas-form-slot .choose-card-form,
+.dl-order-choice__offcanvas-form-slot .choose-card-btn {
+  width: 100%;
+}
+
+.dl-order-choice__offcanvas-form-slot .choose-card-btn {
+  display: flex !important;
 }
 
 @media (max-width: 767.98px) {
