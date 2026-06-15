@@ -407,6 +407,49 @@ body.dl-order-choice-offcanvas-open {
   line-height: 22px;
 }
 
+.dl-order-choice__digital-variants {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.dl-order-choice__digital-variants-title {
+  margin: 0 0 8px;
+  color: #000;
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 700;
+}
+
+.dl-order-choice__digital-variants-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dl-order-choice__digital-variant {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #000;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.dl-order-choice__digital-variant.is-selected {
+  border-color: #c7a985;
+  box-shadow: 0 0 0 2px rgba(223, 198, 167, 0.35);
+}
+
+.dl-order-choice__digital-variant input {
+  flex: 0 0 auto;
+}
+
 .dl-order-choice__offcanvas-form-slot .choose-card {
   margin-bottom: 0 !important;
 }
@@ -423,6 +466,10 @@ body.dl-order-choice-offcanvas-open {
 
 .dl-order-choice__offcanvas-form-slot .choose-card-btn {
   display: flex !important;
+}
+
+.dl-order-choice__offcanvas-form-slot .js-save-design-favorite {
+  display: none !important;
 }
 
 @media (max-width: 767.98px) {

@@ -33,6 +33,27 @@
     selectedInput.value = 'physical';
     form.appendChild(selectedInput);
 
+    var digitalVariantInput = document.createElement('input');
+    digitalVariantInput.type = 'hidden';
+    digitalVariantInput.name = 'daglief_digital_variant';
+    digitalVariantInput.value = '1882';
+    form.appendChild(digitalVariantInput);
+
+    var digitalVariants = [
+      {
+        id: '1882',
+        productType: 'modern_freeform',
+        label: 'Digitaal bestand mobiel 6 pagina’s',
+        href: '/cardtype_submit/modern_freeform/1882'
+      },
+      {
+        id: '1881',
+        productType: 'modern_freeform',
+        label: 'Digitaal bestand mobiel 4 pagina’s',
+        href: '/cardtype_submit/modern_freeform/1881'
+      }
+    ];
+
     var choices = [
       {
         id: 'physical',
@@ -52,7 +73,7 @@
         price: 'Vanaf € 39',
         imageUrl: '/media/13304-kc-media/digitale-kaart-icons-digitale-kaart.webp',
         icon: 'fa-regular fa-file-pdf',
-        buttonText: 'Digitale kaart aanvragen'
+        buttonText: 'Digitale kaart bewerken'
       },
       {
         id: 'physical_digital',
@@ -152,6 +173,37 @@
       return card;
     }
 
+    function createDigitalVariantPicker() {
+      var picker = document.createElement('fieldset');
+      picker.className = 'dl-order-choice__digital-variants';
+      picker.innerHTML = [
+        '<legend class="dl-order-choice__digital-variants-title">Kies het digitale bestand</legend>',
+        '<div class="dl-order-choice__digital-variants-list"></div>'
+      ].join('');
+
+      var list = picker.querySelector('.dl-order-choice__digital-variants-list');
+      digitalVariants.forEach(function (variant, index) {
+        var label = document.createElement('label');
+        label.className = 'dl-order-choice__digital-variant' + (index === 0 ? ' is-selected' : '');
+        label.innerHTML = [
+          '<input type="radio" name="dl_digital_variant_choice" value="' + variant.id + '"' + (index === 0 ? ' checked' : '') + '>',
+          '<span>' + variant.label + '</span>'
+        ].join('');
+        list.appendChild(label);
+      });
+
+      picker.addEventListener('change', function (event) {
+        if (event.target.name === 'dl_digital_variant_choice') {
+          digitalVariantInput.value = event.target.value;
+          picker.querySelectorAll('.dl-order-choice__digital-variant').forEach(function (item) {
+            item.classList.toggle('is-selected', item.contains(event.target));
+          });
+        }
+      });
+
+      return picker;
+    }
+
     var primary = section.querySelector('.dl-order-choice__primary');
     var formSlot = section.querySelector('.dl-order-choice__form-slot');
     var grid = section.querySelector('.dl-order-choice__grid');
@@ -161,6 +213,7 @@
     var offcanvasBackdrop = section.querySelector('.dl-order-choice__offcanvas-backdrop');
     var offcanvasSelectedLabel = section.querySelector('#dl-order-choice-selected-label');
     var offcanvasFormSlot = section.querySelector('.dl-order-choice__offcanvas-form-slot');
+    var digitalVariantPicker = createDigitalVariantPicker();
     choices.forEach(function (choice) {
       var card = createChoiceCard(choice);
       if (choice.id === 'physical') {
@@ -223,7 +276,7 @@
 
       if (choiceId === 'digital') {
         notice.hidden = false;
-        notice.innerHTML = '<span class="dl-order-choice__notice-title">Digitale kaart aanvragen</span>Deze optie loopt nu nog via ons rouwteam. Kies je voor een digitale kaart, dan helpen we je met de juiste variant: 2 pagina\'s voor €39, 4-6 pagina\'s voor €59 of 8 pagina\'s voor €79.<br><a class="dl-order-choice__contact-link" href="/contact">Neem contact op met Daglief</a>';
+        notice.innerHTML = '<span class="dl-order-choice__notice-title">Digitaal bestand mobiel maken</span>Kies hieronder of je een mobiel digitaal bestand met 4 of 6 pagina’s wilt maken. Daarna openen we je kaart in de editor met het gekozen digitale formaat.';
         return;
       }
 
@@ -264,11 +317,14 @@
         openSelected.hidden = false;
         openSelected.textContent = 'Gekozen: ' + choice.label;
         offcanvasFormSlot.textContent = '';
+        if (choice.id === 'digital') {
+          offcanvasFormSlot.appendChild(digitalVariantPicker);
+        }
         offcanvasFormSlot.appendChild(chooseCard);
         offcanvasFormSlot.parentNode.insertBefore(notice, offcanvasFormSlot);
       }
 
-      if (choice.id === 'physical' || choice.id === 'physical_digital') {
+      if (choice.id === 'physical' || choice.id === 'physical_digital' || choice.id === 'digital') {
         form.setAttribute('action', originalAction);
         if (targetUrlInput) targetUrlInput.value = 'edit';
       } else {
@@ -277,6 +333,175 @@
       }
 
       setNotice(choice.id);
+    }
+
+    function getDesignId() {
+      var designInput = form.querySelector('#design_id') || form.querySelector('[name="design_id"]');
+      if (designInput && designInput.value) return designInput.value;
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      return pathParts[pathParts.length - 1];
+    }
+
+    function objectLength(object) {
+      var length = 0;
+      Object.keys(object || {}).forEach(function (key) {
+        if (Object.prototype.hasOwnProperty.call(object, key)) length += 1;
+      });
+      return length;
+    }
+
+    function flattenPresets(items, result) {
+      result = result || [];
+      if (!items) return result;
+      if (Array.isArray(items)) {
+        items.forEach(function (item) { flattenPresets(item, result); });
+        return result;
+      }
+      if (typeof items !== 'object') return result;
+      if (items.pages || items.id || items.name) result.push(items);
+      Object.keys(items).forEach(function (key) {
+        var value = items[key];
+        if (value && typeof value === 'object') flattenPresets(value, result);
+      });
+      return result;
+    }
+
+    function findPresetByVariant(presets, variant) {
+      var flatPresets = flattenPresets(presets);
+      return flatPresets.find(function (preset) {
+        return String(preset.id) === variant.id ||
+          String(preset.preset_id) === variant.id ||
+          String(preset.format_id) === variant.id ||
+          String(preset.cardtype_id) === variant.id ||
+          String(preset.href || '').indexOf(variant.href) !== -1 ||
+          String(preset.url || '').indexOf(variant.href) !== -1;
+      });
+    }
+
+    function getSelectedDigitalVariant() {
+      return digitalVariants.find(function (variant) {
+        return variant.id === digitalVariantInput.value;
+      }) || digitalVariants[0];
+    }
+
+    function getEditorPresets() {
+      var storageKey = 'dagliefDigitalFormatPresets';
+      var storedPresets = window.sessionStorage.getItem(storageKey);
+      if (storedPresets) {
+        try {
+          return Promise.resolve(JSON.parse(storedPresets));
+        } catch (error) {
+          window.sessionStorage.removeItem(storageKey);
+        }
+      }
+
+      return fetch('/api/editor_format_presets', { credentials: 'same-origin' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Kon de editor-formaten niet ophalen.');
+          return response.json();
+        })
+        .then(function (presets) {
+          window.sessionStorage.setItem(storageKey, JSON.stringify(presets));
+          return presets;
+        });
+    }
+
+    function fetchDesign(designId) {
+      return fetch('/choose_card/' + encodeURIComponent(designId) + '?target_url=edit', { credentials: 'same-origin' })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Kon de kaart niet openen voor bewerken.');
+          var coid = new URL(response.url).searchParams.get('coid');
+          if (!coid) throw new Error('Geen coid gevonden voor deze kaart.');
+          return fetch('/api/design?coid=' + encodeURIComponent(coid), { credentials: 'same-origin' })
+            .then(function (designResponse) {
+              if (!designResponse.ok) throw new Error('Kon het design niet ophalen.');
+              return designResponse.json();
+            })
+            .then(function (fullDesignJson) {
+              var designPages = fullDesignJson.designs && fullDesignJson.designs[0]
+                ? fullDesignJson.designs[0].pages
+                : fullDesignJson.pages;
+              if (!designPages) throw new Error('Geen designpagina’s gevonden.');
+              return { pages: designPages, coid: coid };
+            });
+        });
+    }
+
+    function buildConvertPayload(designPages, preset) {
+      var oldSize = objectLength(designPages) - 1;
+      var aspectRatioTarget = preset.pages[0].height / preset.pages[0].width;
+      var aspectRatioDesign = designPages.p1.h / designPages.p1.w;
+      var scale = aspectRatioDesign > aspectRatioTarget ? 'height' : 'width';
+      var pages;
+
+      if (oldSize === 2 && preset.pages.length === 4) {
+        pages = preset.pages.map(function (page, index) {
+          var oldKey = index + 1;
+          if (index === 1) oldKey = 0;
+          if (index === 2) oldKey = 2;
+          if (index !== 1 && index !== 2 && index + 1 > oldSize) oldKey = 0;
+          return Object.assign({ old_key: oldKey, new_key: index + 1 }, page, { scale: scale });
+        });
+      } else if (oldSize === 4 && preset.pages.length === 2) {
+        pages = preset.pages.map(function (page, index) {
+          var oldKey = index === 0 ? 1 : 3;
+          return Object.assign({ old_key: oldKey, new_key: index + 1 }, page, { scale: scale });
+        });
+      } else {
+        pages = preset.pages.map(function (page, index) {
+          return Object.assign({
+            old_key: index + 1 > oldSize ? 0 : index + 1,
+            new_key: index + 1
+          }, page, { scale: scale });
+        });
+      }
+
+      return {
+        fold: preset.fold,
+        new_pages: pages,
+        source_design_json: designPages
+      };
+    }
+
+    function openDigitalEditor() {
+      var designId = getDesignId();
+      var variant = getSelectedDigitalVariant();
+      var originalSubmitText = submitLabel ? submitLabel.textContent : '';
+
+      if (submitButton) submitButton.disabled = true;
+      if (submitLabel) submitLabel.textContent = 'Design omzetten... ';
+      notice.hidden = false;
+      notice.innerHTML = '<span class="dl-order-choice__notice-title">Design omzetten</span>We zetten je kaart om naar <strong>' + variant.label + '</strong> en openen daarna de editor.';
+
+      return Promise.all([fetchDesign(designId), getEditorPresets()])
+        .then(function (results) {
+          var design = results[0];
+          var preset = findPresetByVariant(results[1], variant);
+          if (!preset || !preset.pages || !preset.pages.length) {
+            throw new Error('Het digitale formaat kon niet worden gevonden in de editor presets.');
+          }
+
+          return fetch('/convert_editor_design?coid=' + encodeURIComponent(design.coid), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(buildConvertPayload(design.pages, preset))
+          }).then(function (response) {
+            if (!response.ok) throw new Error('Het omzetten naar digitaal formaat is niet gelukt.');
+            return response.json().then(function () {
+              window.location.href = '/create/edit/v2/?coid=' + encodeURIComponent(design.coid) + '&add_to_basket=false&update_basket=true';
+            });
+          });
+        })
+        .catch(function (error) {
+          if (submitButton) submitButton.disabled = false;
+          if (submitLabel) submitLabel.textContent = originalSubmitText;
+          notice.hidden = false;
+          notice.innerHTML = '<span class="dl-order-choice__notice-title">Omzetten niet gelukt</span>' + error.message + '<br><a class="dl-order-choice__contact-link" href="' + variant.href + '">Open dit digitale formaat handmatig</a>';
+        });
     }
 
     section.addEventListener('click', function (event) {
@@ -294,6 +519,12 @@
     form.addEventListener('submit', function (event) {
       var choiceId = selectedInput.value;
       if (choiceId === 'physical' || choiceId === 'physical_digital') return;
+
+      if (choiceId === 'digital') {
+        event.preventDefault();
+        openDigitalEditor();
+        return;
+      }
 
       event.preventDefault();
       setNotice(choiceId);
