@@ -531,6 +531,15 @@
       notice.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
 
+    if (submitButton) {
+      submitButton.addEventListener('click', function (event) {
+        if (selectedInput.value !== 'digital') return;
+
+        event.preventDefault();
+        openDigitalEditor();
+      });
+    }
+
     section.querySelector('[data-choice="physical"]').classList.add('is-selected');
     updateForm('physical');
   });
