@@ -44,13 +44,15 @@
         id: '1882',
         productType: 'modern_freeform',
         label: 'Digitaal bestand mobiel 6 pagina’s',
-        href: '/cardtype_submit/modern_freeform/1882'
+        href: '/cardtype_submit/modern_freeform/1882',
+        pageCount: 6
       },
       {
         id: '1881',
         productType: 'modern_freeform',
         label: 'Digitaal bestand mobiel 4 pagina’s',
-        href: '/cardtype_submit/modern_freeform/1881'
+        href: '/cardtype_submit/modern_freeform/1881',
+        pageCount: 4
       }
     ];
 
@@ -350,51 +352,51 @@
       return length;
     }
 
-    function flattenPresets(items, result) {
-      result = result || [];
-      if (!items) return result;
-      if (Array.isArray(items)) {
-        items.forEach(function (item) { flattenPresets(item, result); });
-        return result;
-      }
-      if (typeof items !== 'object') return result;
-      if (items.pages || items.id || items.name) result.push(items);
-      Object.keys(items).forEach(function (key) {
-        var value = items[key];
-        if (value && typeof value === 'object') flattenPresets(value, result);
-      });
-      return result;
-    }
-
-    function findPresetByVariant(presets, variant) {
-      var flatPresets = flattenPresets(presets);
-      return flatPresets.find(function (preset) {
-        return String(preset.id) === variant.id ||
-          String(preset.preset_id) === variant.id ||
-          String(preset.format_id) === variant.id ||
-          String(preset.cardtype_id) === variant.id ||
-          String(preset.freeform_template_id) === variant.id ||
-          String(preset.specs && preset.specs.freeform_template_id) === variant.id ||
-          String(preset.href || '').indexOf(variant.href) !== -1 ||
-          String(preset.url || '').indexOf(variant.href) !== -1;
-      });
-    }
-
     function getSelectedDigitalVariant() {
       return digitalVariants.find(function (variant) {
         return variant.id === digitalVariantInput.value;
       }) || digitalVariants[0];
     }
 
-    function getEditorPresets() {
-      return fetch('/api/editor_format_presets', {
-        cache: 'no-store',
-        credentials: 'same-origin'
-      })
-        .then(function (response) {
-          if (!response.ok) throw new Error('Kon de editor-formaten niet ophalen.');
-          return response.json();
+    function createDigitalPreset(variant) {
+      var sheets = [];
+      var pageCount = variant.pageCount || 4;
+
+      for (var index = 0; index < pageCount; index += 1) {
+        var pageNumber = index + 1;
+        sheets.push({
+          bleed_canvas: 0,
+          height_canvas: 677.33,
+          is_front: pageNumber === 1 || pageNumber >= 4,
+          spreads: [[{
+            bleed_bottom: 0,
+            bleed_left: 0,
+            bleed_right: 0,
+            bleed_top: 0,
+            foil_enabled: false,
+            height: 677.33,
+            is_hidden: false,
+            name: 'Pagina ' + pageNumber,
+            page: 'p' + pageNumber,
+            rotation: 0,
+            spot_uv_enabled: false,
+            width: 381,
+            x: 0,
+            y: 0
+          }]],
+          width_canvas: 381
         });
+      }
+
+      return {
+        fold: 'none',
+        name: variant.label,
+        specs: {
+          freeform_template_id: Number(variant.id),
+          scale_width: 381,
+          sheets: sheets
+        }
+      };
     }
 
     function fetchDesign(designId) {
@@ -483,13 +485,9 @@
       notice.hidden = false;
       notice.innerHTML = '<span class="dl-order-choice__notice-title">Design omzetten</span>We zetten je kaart om naar <strong>' + variant.label + '</strong> en openen daarna de editor.';
 
-      return Promise.all([fetchDesign(designId), getEditorPresets()])
-        .then(function (results) {
-          var design = results[0];
-          var preset = findPresetByVariant(results[1], variant);
-          if (!preset || !getPresetPages(preset).length) {
-            throw new Error('Het digitale formaat kon niet worden gevonden in de editor presets.');
-          }
+      return fetchDesign(designId)
+        .then(function (design) {
+          var preset = createDigitalPreset(variant);
 
           return fetch('/convert_editor_design?coid=' + encodeURIComponent(design.coid), {
             method: 'POST',
