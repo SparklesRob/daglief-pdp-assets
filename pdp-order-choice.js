@@ -104,8 +104,6 @@
     section.setAttribute('aria-label', 'Hoe wil je je kaart bestellen?');
     var digitalOptionImage = '/media/13304-kc-media/digitale-kaart-icons-digitale-kaart.webp';
     section.innerHTML = [
-      '<div class="dl-order-choice__primary"></div>',
-      '<div class="dl-order-choice__form-slot"></div>',
       '<div class="dl-order-choice__header">',
       '  <div class="dl-order-choice__title-wrap">',
       '    <h2 class="dl-order-choice__title">Hoe wil je je kaart bestellen?</h2>',
@@ -132,6 +130,7 @@
       '    <i class="fa-regular fa-chevron-right" aria-hidden="true"></i>',
       '  </button>',
       '</div>',
+      '<div class="dl-order-choice__form-slot"></div>',
       '<div class="dl-order-choice__offcanvas-backdrop" data-dl-order-choice-close hidden></div>',
       '<aside class="dl-order-choice__offcanvas" id="dl-order-choice-offcanvas" role="dialog" tabindex="-1" aria-modal="true" aria-hidden="true" aria-labelledby="dl-order-choice-offcanvas-title">',
       '  <div class="dl-order-choice__offcanvas-header">',
@@ -206,7 +205,6 @@
       return picker;
     }
 
-    var primary = section.querySelector('.dl-order-choice__primary');
     var formSlot = section.querySelector('.dl-order-choice__form-slot');
     var grid = section.querySelector('.dl-order-choice__grid');
     var openOptionsButton = section.querySelector('.dl-order-choice__open-options');
@@ -217,12 +215,7 @@
     var offcanvasFormSlot = section.querySelector('.dl-order-choice__offcanvas-form-slot');
     var digitalVariantPicker = createDigitalVariantPicker();
     choices.forEach(function (choice) {
-      var card = createChoiceCard(choice);
-      if (choice.id === 'physical') {
-        primary.appendChild(card);
-      } else {
-        grid.appendChild(card);
-      }
+      grid.appendChild(createChoiceCard(choice));
     });
 
     chooseCard.parentNode.insertBefore(section, chooseCard);
