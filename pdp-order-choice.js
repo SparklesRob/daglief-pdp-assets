@@ -240,7 +240,7 @@
       offcanvas.setAttribute('aria-hidden', 'false');
       openOptionsButton.setAttribute('aria-expanded', 'true');
       document.body.classList.add('dl-order-choice-offcanvas-open');
-      placeForm(getSelectedChoiceObj());
+      placeForm();
       offcanvas.focus();
     }
 
@@ -250,7 +250,7 @@
       offcanvas.setAttribute('aria-hidden', 'true');
       openOptionsButton.setAttribute('aria-expanded', 'false');
       document.body.classList.remove('dl-order-choice-offcanvas-open');
-      placeForm(getSelectedChoiceObj());
+      placeForm();
     }
 
     openOptionsButton.addEventListener('click', openOffcanvas);
@@ -279,7 +279,13 @@
 
       if (choiceId === 'print_file') {
         notice.hidden = false;
-        notice.innerHTML = '<span class="dl-order-choice__notice-title">Drukbestand aanvragen</span>Wil je de kaart zelf laten drukken? Dan koop je het design af voor €90. Ons rouwteam helpt je met het juiste bestand voor de drukker.<br><a class="dl-order-choice__contact-link" href="/contact">Neem contact op met Daglief</a>';
+        notice.innerHTML = '<span class="dl-order-choice__notice-title">Zelf drukken? Bestel een drukbestand</span>' +
+          'Wil je je kaart zelf laten drukken? Dat regel je zo:' +
+          '<ol class="dl-order-choice__steps">' +
+          '<li>Ontwerp eerst je kaart helemaal naar wens in onze editor.</li>' +
+          '<li>Kies bij de volgende stap, onder <strong>“Soort bestelling”</strong>, voor <strong>Drukbestand</strong>.</li>' +
+          '<li>Direct na het afrekenen download je je kaart als hoge-resolutie PDF.</li>' +
+          '</ol>';
         return;
       }
 
@@ -287,18 +293,13 @@
       notice.innerHTML = '';
     }
 
-    function getSelectedChoiceObj() {
-      return choices.find(function (item) { return item.id === selectedInput.value; }) || choices[0];
-    }
-
-    function placeForm(choice) {
-      var keepInMain = choice.id === 'physical' && !offcanvas.classList.contains('is-open');
-      if (keepInMain) {
-        formSlot.appendChild(chooseCard);
-        section.appendChild(notice);
-      } else {
+    function placeForm() {
+      if (offcanvas.classList.contains('is-open')) {
         offcanvasFormSlot.appendChild(chooseCard);
         offcanvasFormSlot.parentNode.insertBefore(notice, offcanvasFormSlot);
+      } else {
+        formSlot.appendChild(chooseCard);
+        section.appendChild(notice);
       }
     }
 
@@ -332,15 +333,10 @@
       if (choice.id === 'digital') {
         offcanvasFormSlot.appendChild(digitalVariantPicker);
       }
-      placeForm(choice);
+      placeForm();
 
-      if (choice.id === 'physical' || choice.id === 'physical_digital' || choice.id === 'digital') {
-        form.setAttribute('action', originalAction);
-        if (targetUrlInput) targetUrlInput.value = 'edit';
-      } else {
-        form.setAttribute('action', '/contact');
-        if (targetUrlInput) targetUrlInput.value = 'contact';
-      }
+      form.setAttribute('action', originalAction);
+      if (targetUrlInput) targetUrlInput.value = 'edit';
 
       setNotice(choice.id);
     }
@@ -625,7 +621,7 @@
 
     form.addEventListener('submit', function (event) {
       var choiceId = selectedInput.value;
-      if (choiceId === 'physical' || choiceId === 'physical_digital') return;
+      if (choiceId === 'physical' || choiceId === 'physical_digital' || choiceId === 'print_file') return;
 
       if (choiceId === 'digital') {
         event.preventDefault();
