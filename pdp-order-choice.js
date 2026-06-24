@@ -240,6 +240,7 @@
       offcanvas.setAttribute('aria-hidden', 'false');
       openOptionsButton.setAttribute('aria-expanded', 'true');
       document.body.classList.add('dl-order-choice-offcanvas-open');
+      placeForm(getSelectedChoiceObj());
       offcanvas.focus();
     }
 
@@ -249,6 +250,7 @@
       offcanvas.setAttribute('aria-hidden', 'true');
       openOptionsButton.setAttribute('aria-expanded', 'false');
       document.body.classList.remove('dl-order-choice-offcanvas-open');
+      placeForm(getSelectedChoiceObj());
     }
 
     openOptionsButton.addEventListener('click', openOffcanvas);
@@ -285,6 +287,21 @@
       notice.innerHTML = '';
     }
 
+    function getSelectedChoiceObj() {
+      return choices.find(function (item) { return item.id === selectedInput.value; }) || choices[0];
+    }
+
+    function placeForm(choice) {
+      var keepInMain = choice.id === 'physical' && !offcanvas.classList.contains('is-open');
+      if (keepInMain) {
+        formSlot.appendChild(chooseCard);
+        section.appendChild(notice);
+      } else {
+        offcanvasFormSlot.appendChild(chooseCard);
+        offcanvasFormSlot.parentNode.insertBefore(notice, offcanvasFormSlot);
+      }
+    }
+
     function updateForm(choiceId) {
       var choice = choices.find(function (item) { return item.id === choiceId; }) || choices[0];
       selectedInput.value = choice.id;
@@ -306,18 +323,16 @@
       if (choice.id === 'physical') {
         openSelected.hidden = true;
         openSelected.textContent = '';
-        formSlot.appendChild(chooseCard);
-        section.appendChild(notice);
       } else {
         openSelected.hidden = false;
         openSelected.textContent = 'Gekozen: ' + choice.label;
-        offcanvasFormSlot.textContent = '';
-        if (choice.id === 'digital') {
-          offcanvasFormSlot.appendChild(digitalVariantPicker);
-        }
-        offcanvasFormSlot.appendChild(chooseCard);
-        offcanvasFormSlot.parentNode.insertBefore(notice, offcanvasFormSlot);
       }
+
+      offcanvasFormSlot.textContent = '';
+      if (choice.id === 'digital') {
+        offcanvasFormSlot.appendChild(digitalVariantPicker);
+      }
+      placeForm(choice);
 
       if (choice.id === 'physical' || choice.id === 'physical_digital' || choice.id === 'digital') {
         form.setAttribute('action', originalAction);
@@ -398,7 +413,7 @@
           if (!response.ok) throw new Error('Kon de kaart niet openen voor bewerken.');
           var coid = new URL(response.url).searchParams.get('coid');
           if (!coid) throw new Error('Geen coid gevonden voor deze kaart.');
-          return fetch('/api/design?coid=' + encodeURIComponent(coid), { credentials: 'same-origin' })
+          return fetch('/api/design?coid=' + encodeURIComponent(coid) + '&expected_version=1', { credentials: 'same-origin' })
             .then(function (designResponse) {
               if (!designResponse.ok) throw new Error('Kon het design niet ophalen.');
               return designResponse.json();
@@ -431,6 +446,31 @@
       });
     }
 
+    function stripCutLayers(designPages) {
+      for (var pk in designPages) {
+        if (/^p\d+$/.test(pk) && designPages[pk] && designPages[pk].images) {
+          designPages[pk].images = designPages[pk].images.filter(function (img) {
+            return img.layer_type !== 'cut_through_inverted';
+          });
+        }
+      }
+    }
+
+    // De specs-convert kent zelf lage route-nummers toe aan gegenereerde lagen.
+    // Botst dat met een bron-laag op dezelfde pagina, dan loopt de editor stil
+    // vast. Hernummer de bron-routes daarom naar hoge waarden.
+    function renumberSourceRoutes(designPages) {
+      for (var pk in designPages) {
+        if (!/^p\d+$/.test(pk) || !designPages[pk] || !designPages[pk].images) continue;
+        var pageNum = parseInt(pk.replace('p', ''), 10);
+        for (var i = 0; i < designPages[pk].images.length; i++) {
+          var rt = designPages[pk].images[i].route || [];
+          if (rt.length === 3) designPages[pk].images[i].route = [rt[0], 100 + i, pageNum];
+          else if (rt.length === 2) designPages[pk].images[i].route = [100 + i, pageNum];
+        }
+      }
+    }
+
     function buildConvertPayload(designPages, preset) {
       var presetPages = getPresetPages(preset);
       var oldSize = objectLength(designPages) - 1;
@@ -438,6 +478,9 @@
       var aspectRatioDesign = designPages.p1.h / designPages.p1.w;
       var scale = aspectRatioDesign > aspectRatioTarget ? 'height' : 'width';
       var pages;
+
+      stripCutLayers(designPages);
+      if (preset.specs) renumberSourceRoutes(designPages);
 
       if (oldSize === 2 && presetPages.length === 4) {
         pages = presetPages.map(function (page, index) {
@@ -461,11 +504,65 @@
         });
       }
 
-      return {
+      var payload = {
         fold: preset.fold,
         new_pages: pages,
         source_design_json: designPages
       };
+      if (preset.specs) payload.specs = preset.specs;
+      return payload;
+    }
+
+    // Na een specs-convert kunnen twee lagen dezelfde route op één pagina krijgen
+    // (= stille deadlock in de editor). Detecteer duplicaten, hernummer ze en
+    // schrijf het resultaat terug via een identieke specs-convert.
+    function dedupeRoutes(coid, preset) {
+      return fetch('/api/design?coid=' + encodeURIComponent(coid) + '&expected_version=1', { credentials: 'same-origin' })
+        .then(function (resp) { return resp.ok ? resp.json() : null; })
+        .then(function (json) {
+          if (!json || !json.designs || !json.designs[0]) return;
+          var pages = json.designs[0].pages;
+          var changed = false;
+          var pageKeys = [];
+          for (var pk in pages) {
+            if (!/^p\d+$/.test(pk)) continue;
+            pageKeys.push(pk);
+            var imgs = pages[pk].images || [];
+            var pageNum = parseInt(pk.replace('p', ''), 10);
+            var maxX = 0;
+            for (var i = 0; i < imgs.length; i++) {
+              var rt = imgs[i].route || [];
+              var x = rt.length === 3 ? rt[1] : rt[0];
+              if (typeof x === 'number' && x > maxX) maxX = x;
+            }
+            var seen = {};
+            for (var j = 0; j < imgs.length; j++) {
+              var key = JSON.stringify(imgs[j].route || null);
+              if (seen[key]) {
+                maxX += 1;
+                var rt2 = imgs[j].route || [];
+                imgs[j].route = rt2.length === 3 ? [rt2[0], maxX, pageNum] : [maxX, pageNum];
+                changed = true;
+              } else {
+                seen[key] = true;
+              }
+            }
+          }
+          if (!changed) return;
+          var newPages = pageKeys.map(function (pk) {
+            var n = parseInt(pk.replace('p', ''), 10);
+            return { old_key: n, new_key: n, scale: 'width', width: pages[pk].w, height: pages[pk].h, bleed: pages[pk].bleed || 0 };
+          });
+          return fetch('/convert_editor_design?coid=' + encodeURIComponent(coid), {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fold: preset.fold, new_pages: newPages, source_design_json: pages, specs: preset.specs })
+          }).then(function (r) {
+            if (!r.ok) throw new Error('Route-reparatie mislukt');
+            return r.json();
+          });
+        });
     }
 
     function openDigitalEditor() {
@@ -478,28 +575,33 @@
       notice.hidden = false;
       notice.innerHTML = '<span class="dl-order-choice__notice-title">Design omzetten</span>We zetten je kaart om naar <strong>' + variant.label + '</strong> en openen daarna de editor.';
 
+      var activeCoid;
+      var activePreset = createDigitalPreset(variant);
+
       return fetchDesign(designId)
         .then(function (design) {
-          var preset = createDigitalPreset(variant);
-          var convertPayload = buildConvertPayload(design.pages, preset);
-          var convertParams = new URLSearchParams();
-          convertParams.set('coid', design.coid);
-          convertParams.set('fold', convertPayload.fold);
-          convertParams.set('new_pages', JSON.stringify(convertPayload.new_pages));
-          convertParams.set('source_design_json', JSON.stringify(convertPayload.source_design_json));
+          activeCoid = design.coid;
+          var convertPayload = buildConvertPayload(design.pages, activePreset);
 
-          return fetch('/convert_editor_design?' + convertParams.toString(), {
+          return fetch('/convert_editor_design?coid=' + encodeURIComponent(design.coid), {
             method: 'POST',
             credentials: 'same-origin',
             headers: {
-              Accept: 'application/json'
-            }
-          }).then(function (response) {
-            if (!response.ok) throw new Error('Het omzetten naar digitaal formaat is niet gelukt.');
-            return response.json().then(function () {
-              window.location.href = '/create/edit/v2/?coid=' + encodeURIComponent(design.coid) + '&add_to_basket=false&update_basket=true';
-            });
+              Accept: 'application/json',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(convertPayload)
           });
+        })
+        .then(function (response) {
+          if (!response.ok) throw new Error('Het omzetten naar digitaal formaat is niet gelukt.');
+          return response.json();
+        })
+        .then(function () {
+          return dedupeRoutes(activeCoid, activePreset);
+        })
+        .then(function () {
+          window.location.href = '/create/edit/v2/?coid=' + encodeURIComponent(activeCoid) + '&add_to_basket=false&update_basket=true';
         })
         .catch(function (error) {
           if (submitButton) submitButton.disabled = false;
